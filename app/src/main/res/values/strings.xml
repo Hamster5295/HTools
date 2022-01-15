@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">H Tools</string>
+    <string name="start">开始</string>
+
+    <!-- 功能区 -->
+    <string name="func_tts">文字转语音</string>
+    <string name="func_draw">函数图像绘制</string>
+    <string name="func_heading_poem">藏头诗生成</string>>
+</resources>
