@@ -1,20 +1,18 @@
 package com.hamster5295.htools.activities;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-
-import android.Manifest;
-import android.app.Activity;
-import android.content.pm.PackageManager;
-import android.os.Bundle;
-import android.os.Environment;
-import android.os.Looper;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.TextView;
-import android.widget.Toast;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -25,7 +23,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
-import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.Call;
@@ -39,6 +36,7 @@ public class TTSActivity extends AppCompatActivity {
     TextView log;
     Button b;
     EditText t, fn;
+    Handler logHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -49,6 +47,13 @@ public class TTSActivity extends AppCompatActivity {
         b = findViewById(R.id.btn_tts_go);
         t = findViewById(R.id.et_tts);
         fn = findViewById(R.id.et_tts_fileName);
+
+        logHandler = new Handler() {
+            @Override
+            public void handleMessage(@NonNull Message msg) {
+                log.setText(msg.getData().getString("Log"));
+            }
+        };
 
         new Thread(() -> {
             try {
@@ -65,20 +70,21 @@ public class TTSActivity extends AppCompatActivity {
                 }
             } catch (IOException e) {
                 e.printStackTrace();
+
             }
         }).start();
-
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+            b.setOnClickListener((v) ->
+                    new Thread(() -> {
+                        try {
+                            getTTS(logHandler);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+                    }).start()
+            );
         } else {
-            b.setOnClickListener((v) -> new Thread(() -> {
-                try {
-                    getTTS();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    log.setText("错误: " + e.getMessage());
-                }
-            }).start());
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
         }
     }
 
@@ -86,13 +92,15 @@ public class TTSActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                b.setOnClickListener((v) -> new Thread(() -> {
-                    try {
-                        getTTS();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }).start());
+                b.setOnClickListener((v) ->
+                        new Thread(() -> {
+                            try {
+                                getTTS(logHandler);
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }).start()
+                );
             } else {
                 log.setText(R.string.no_permission);
             }
@@ -101,9 +109,14 @@ public class TTSActivity extends AppCompatActivity {
         }
     }
 
-    protected void getTTS() throws Exception {
+    protected void getTTS(Handler logger) throws Exception {
+        Message msg = new Message();
+        Bundle b = new Bundle();
+
         if (fn.getText().toString().equals("")) {
-            log.setText("请输入文件名");
+            b.putString("Log", "请输入文件名");
+            msg.setData(b);
+            logger.sendMessage(msg);
             return;
         }
 
@@ -130,9 +143,9 @@ public class TTSActivity extends AppCompatActivity {
         Call call = client.newCall(request);
         Response response = call.execute();
         if (response.isSuccessful()) {
-            File f = new File(Environment.getExternalStorageDirectory(), "HTools/TTS/");
+            File f = new File(TTSActivity.this.getExternalFilesDir(null), "/TTS");
             f.mkdirs();
-            FileOutputStream os = new FileOutputStream(f.getPath() + "/" + fn.getText().toString() + ".mp3");
+            FileOutputStream os = new FileOutputStream(f.getAbsolutePath() + "/" + fn.getText().toString() + ".mp3");
             os.write(response.body().bytes());
             os.flush();
             os.close();
@@ -140,19 +153,27 @@ public class TTSActivity extends AppCompatActivity {
         } else {
             switch (response.code()) {
                 case 501:
-                    log.setText("超时");
+                    b.putString("Log", "网络超时");
+                    msg.setData(b);
+                    logger.sendMessage(msg);
                     break;
 
                 case 502:
-                    log.setText("参数错误");
+                    b.putString("Log", "参数错误");
+                    msg.setData(b);
+                    logger.sendMessage(msg);
                     break;
 
                 case 503:
-                    log.setText("Token无效");
+                    b.putString("Log", "Token无效");
+                    msg.setData(b);
+                    logger.sendMessage(msg);
                     break;
 
                 case 504:
-                    log.setText("文本编码有误");
+                    b.putString("Log", "文本编码有误");
+                    msg.setData(b);
+                    logger.sendMessage(msg);
                     break;
 
                 default:
