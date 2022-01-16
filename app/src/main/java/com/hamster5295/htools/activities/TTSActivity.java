@@ -76,6 +76,7 @@ public class TTSActivity extends AppCompatActivity {
                     getTTS();
                 } catch (Exception e) {
                     e.printStackTrace();
+                    log.setText("错误: " + e.getMessage());
                 }
             }).start());
         }
@@ -83,8 +84,6 @@ public class TTSActivity extends AppCompatActivity {
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-
-
         if (grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 b.setOnClickListener((v) -> new Thread(() -> {
@@ -103,7 +102,7 @@ public class TTSActivity extends AppCompatActivity {
     }
 
     protected void getTTS() throws Exception {
-        if(fn.getText().toString().equals("")){
+        if (fn.getText().toString().equals("")) {
             log.setText("请输入文件名");
             return;
         }
