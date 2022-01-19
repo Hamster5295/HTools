@@ -34,6 +34,14 @@
             android:inputType="textPersonName"
             android:minHeight="48dp" />
 
+        <Spinner
+            android:id="@+id/spinner_tts"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:layout_margin="10dp"
+            android:layout_weight="0"
+            android:entries="@array/tts_sound_font" />
+
         <Button
             android:id="@+id/btn_tts_go"
             android:layout_width="match_parent"

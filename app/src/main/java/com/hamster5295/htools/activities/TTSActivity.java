@@ -1,18 +1,25 @@
 package com.hamster5295.htools.activities;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.view.MenuItem;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.Spinner;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.preference.PreferenceManager;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
@@ -33,28 +40,38 @@ import okhttp3.Response;
 
 public class TTSActivity extends AppCompatActivity {
 
-    TextView log;
-    Button b;
-    EditText t, fn;
-    Handler logHandler;
+    private TextView text_log;
+    private Button btn_save;
+    private EditText input_content, input_fileName;
+    private Spinner spinner_soundFont;
+    private Handler logHandler;
+
+    private byte[] tempFile;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_ttsactivity);
 
-        log = findViewById(R.id.text_tts_log);
-        b = findViewById(R.id.btn_tts_go);
-        t = findViewById(R.id.et_tts);
-        fn = findViewById(R.id.et_tts_fileName);
+        ActionBar actionBar = getSupportActionBar();
+        if (actionBar != null) {
+            actionBar.setDisplayHomeAsUpEnabled(true);
+        }
+
+        text_log = findViewById(R.id.text_tts_log);
+        btn_save = findViewById(R.id.btn_tts_go);
+        input_content = findViewById(R.id.et_tts);
+        input_fileName = findViewById(R.id.et_tts_fileName);
+        spinner_soundFont = findViewById(R.id.spinner_tts);
 
         logHandler = new Handler() {
             @Override
             public void handleMessage(@NonNull Message msg) {
-                log.setText(msg.getData().getString("Log"));
+                text_log.setText(msg.getData().getString("Log"));
             }
         };
 
+        //获取百度API的Token
         new Thread(() -> {
             try {
                 OkHttpClient client = new OkHttpClient();
@@ -73,8 +90,11 @@ public class TTSActivity extends AppCompatActivity {
 
             }
         }).start();
+
+        //检查权限是否获取
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-            b.setOnClickListener((v) ->
+            //添加Listener
+            btn_save.setOnClickListener((v) ->
                     new Thread(() -> {
                         try {
                             getTTS(logHandler);
@@ -84,6 +104,7 @@ public class TTSActivity extends AppCompatActivity {
                     }).start()
             );
         } else {
+            //请求权限
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE, Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
         }
     }
@@ -92,7 +113,7 @@ public class TTSActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         if (grantResults.length > 0) {
             if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                b.setOnClickListener((v) ->
+                btn_save.setOnClickListener((v) ->
                         new Thread(() -> {
                             try {
                                 getTTS(logHandler);
@@ -102,21 +123,51 @@ public class TTSActivity extends AppCompatActivity {
                         }).start()
                 );
             } else {
-                log.setText(R.string.no_permission);
+                text_log.setText(R.string.no_permission);
             }
         } else {
-            log.setText(R.string.no_permission);
+            text_log.setText(R.string.no_permission);
         }
     }
 
-    protected void getTTS(Handler logger) throws Exception {
-        Message msg = new Message();
-        Bundle b = new Bundle();
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (!(resultCode == RESULT_OK) || data == null) {
+            log("文件选择中断");
+            return;
+        }
 
-        if (fn.getText().toString().equals("")) {
-            b.putString("Log", "请输入文件名");
-            msg.setData(b);
-            logger.sendMessage(msg);
+        if (tempFile == null) {
+            log("文件获取失败");
+            return;
+        }
+
+        if (requestCode == 1) {
+            Uri u = data.getData();
+
+            try {
+                getContentResolver().openOutputStream(u).write(tempFile);
+                log("保存成功! 目录: sdcard/Download");
+            } catch (IOException e) {
+                e.printStackTrace();
+                log("错误: " + e.getMessage());
+            }
+        }
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    protected void getTTS(Handler logger) throws Exception {
+        if (input_fileName.getText().toString().equals("")) {
+            log("请输入文件名");
             return;
         }
 
@@ -124,14 +175,35 @@ public class TTSActivity extends AppCompatActivity {
                 .callTimeout(5000, TimeUnit.MILLISECONDS)
                 .build();
 
+        String soundFont;
+
+        switch (spinner_soundFont.getSelectedItemPosition()) {
+            case 0:
+                soundFont = "1";
+                break;
+            case 1:
+                soundFont = "3";
+                break;
+            case 2:
+                soundFont = "0";
+                break;
+            case 3:
+                soundFont = "4";
+                break;
+
+            default:
+                soundFont = "0";
+                break;
+        }
+
         FormBody body = new FormBody.Builder()
-                .add("tex", URLEncoder.encode(t.getText().toString(), "utf-8"))
+                .add("tex", URLEncoder.encode(input_content.getText().toString(), "utf-8"))
                 .add("tok", GlobalData.accessToken)
                 .add("cuid", "qwq")
                 .add("ctp", "1")
                 .add("lan", "zh")
                 .add("spd", "5")
-                .add("per", "0")
+                .add("per", soundFont)
                 .add("aue", "3")
                 .build();
 
@@ -143,44 +215,54 @@ public class TTSActivity extends AppCompatActivity {
         Call call = client.newCall(request);
         Response response = call.execute();
         if (response.isSuccessful()) {
-            File f = new File(TTSActivity.this.getExternalFilesDir(null), "/TTS");
-            f.mkdirs();
-            FileOutputStream os = new FileOutputStream(f.getAbsolutePath() + "/" + fn.getText().toString() + ".mp3");
-            os.write(response.body().bytes());
-            os.flush();
-            os.close();
-            log.setText("保存成功!\n目录: " + f.getPath() + "/" + fn.getText().toString() + ".mp3");
+            tempFile = response.body().bytes();
+
+            if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
+                File f = new File(TTSActivity.this.getExternalFilesDir(null), "/TTS");
+                f.mkdirs();
+                FileOutputStream os = new FileOutputStream(f.getAbsolutePath() + "/" + input_fileName.getText().toString() + ".mp3");
+                os.write(tempFile);
+                os.flush();
+                os.close();
+                log("保存成功!\n目录: " + f.getPath() + "/" + input_fileName.getText().toString() + ".mp3");
+            } else {
+                Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                it.addCategory(Intent.CATEGORY_OPENABLE);
+                it.setType("audio/mpeg");
+                it.putExtra(Intent.EXTRA_TITLE, input_fileName.getText().toString() + ".mp3");
+                startActivityForResult(it, 1);
+            }
         } else {
             switch (response.code()) {
                 case 501:
-                    b.putString("Log", "网络超时");
-                    msg.setData(b);
-                    logger.sendMessage(msg);
+                    log("网络超时");
                     break;
 
                 case 502:
-                    b.putString("Log", "参数错误");
-                    msg.setData(b);
-                    logger.sendMessage(msg);
+                    log("参数错误");
                     break;
 
                 case 503:
-                    b.putString("Log", "Token无效");
-                    msg.setData(b);
-                    logger.sendMessage(msg);
+                    log("Token无效");
                     break;
 
                 case 504:
-                    b.putString("Log", "文本编码有误");
-                    msg.setData(b);
-                    logger.sendMessage(msg);
+                    log("文本编码有误");
                     break;
 
                 default:
                     assert response.body() != null;
-                    log.setText(response.body().string());
+                    log(response.body().string());
                     break;
             }
         }
+    }
+
+    private void log(String str) {
+        Message msg = new Message();
+        Bundle b = new Bundle();
+        b.putString("Log", str);
+        msg.setData(b);
+        logHandler.handleMessage(msg);
     }
 }
