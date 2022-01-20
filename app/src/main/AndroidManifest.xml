@@ -12,6 +12,10 @@
         android:theme="@style/Theme.HTools"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".activities.MusicGetActivity"
+            android:exported="false"
+            android:label="@string/func_music" />
+        <activity
             android:name=".activities.SettingsActivity"
             android:exported="false"
             android:label="@string/activity_settings" />
@@ -34,8 +38,8 @@
         </activity>
     </application>
 
-    <uses-permission android:name="android.permission.INTERNET" />
-
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+
+    <uses-permission android:name="android.permission.INTERNET" />
 
 </manifest>

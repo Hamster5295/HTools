@@ -134,21 +134,23 @@ public class TTSActivity extends AppCompatActivity {
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (!(resultCode == RESULT_OK) || data == null) {
-            log("文件选择中断");
+            log(getString(R.string.err_file_select_blocked));
             return;
         }
 
-        if (tempFile == null) {
-            log("文件获取失败");
-            return;
-        }
 
         if (requestCode == 1) {
+
+            if (tempFile == null) {
+                log(getString(R.string.err_file_null));
+                return;
+            }
+
             Uri u = data.getData();
 
             try {
                 getContentResolver().openOutputStream(u).write(tempFile);
-                log("保存成功! 目录: sdcard/Download");
+                log("保存成功! 目录: " + u.getPath());
             } catch (IOException e) {
                 e.printStackTrace();
                 log("错误: " + e.getMessage());

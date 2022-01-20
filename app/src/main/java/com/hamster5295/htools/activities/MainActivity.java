@@ -3,7 +3,6 @@ package com.hamster5295.htools.activities;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
-import androidx.preference.PreferenceManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 
@@ -19,7 +18,6 @@ import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity {
 
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -29,8 +27,9 @@ public class MainActivity extends AppCompatActivity {
         };
 
         data.add(new MenuItem(getString(R.string.func_tts), ContextCompat.getDrawable(this, R.drawable.ic_func_tts), TTSActivity.class));
-        data.add(new MenuItem(getString(R.string.func_draw), ContextCompat.getDrawable(this, R.drawable.ic_func_draw), WebActivity.class, "https://www.desmos.com/calculator?lang=zh-CN"));
+        data.add(new MenuItem(getString(R.string.func_draw_function), ContextCompat.getDrawable(this, R.drawable.ic_func_draw), WebActivity.class, "https://www.desmos.com/calculator?lang=zh-CN"));
         data.add(new MenuItem(getString(R.string.func_heading_poem), ContextCompat.getDrawable(this, R.drawable.ic_func_heading_poem), WebActivity.class, "https://cts.mofans.net/"));
+        data.add(new MenuItem(getString(R.string.func_music), ContextCompat.getDrawable(this, R.drawable.ic_func_music), MusicGetActivity.class));
 
         RecyclerView v = findViewById(R.id.menu);
 
