@@ -12,35 +12,27 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
-import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.hamster5295.htools.OutputUtil;
-import com.hamster5295.htools.ProgressResponseBody;
 import com.hamster5295.htools.R;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Locale;
+import java.io.InputStream;
 
 import okhttp3.Call;
-import okhttp3.Interceptor;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class VideoGetActivity extends AppCompatActivity {
 
@@ -48,11 +40,13 @@ public class VideoGetActivity extends AppCompatActivity {
     private Button btn_resolve;
     private TextView text_log;
     private ProgressBar bar_download;
-    private ProgressResponseBody.ProgressListener listener;
 
     private Thread thread_download;
 
-    private byte[] tempFile;
+    private long tempFileLength;
+    private InputStream tempInput;
+
+    private boolean isDownloading = false;
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
@@ -71,88 +65,6 @@ public class VideoGetActivity extends AppCompatActivity {
         text_log = findViewById(R.id.text_video_log);
         bar_download = findViewById(R.id.pgbar_video_download);
 
-        listener = (current, total, done) -> {
-            bar_download.setProgress(Math.round(100 * (float) current / (float) total), true);
-            if (done) hideProgressBar();
-        };
-
-        thread_download = new Thread(() -> {
-            log("开始解析视频...");
-            OkHttpClient client = new OkHttpClient.Builder()
-                    .build();
-
-            String requestUrl = "https://api.injahow.cn/bparse/?bv=" + input_url.getText().toString().substring(2) +
-                    "&p=" + (input_p.getText().toString() == "" ? "1" : input_p.getText().toString()) +
-                    "&format=mp4" +
-                    "&otype=json";
-            Request request = new Request.Builder()
-                    .url(requestUrl)
-                    .get()
-                    .build();
-
-            Call call = client.newCall(request);
-            try {
-                Response re = call.execute();
-                if (re.isSuccessful()) {
-                    JSONObject videoInfo = JSONObject.parseObject(re.body().string());
-
-                    if (videoInfo.getString("url") == null) {
-                        log("错误: 找不到该视频");
-                        return;
-                    }
-                    log("视频解析完毕, 正在下载...");
-
-                    runOnUiThread(() -> {
-                        bar_download.setVisibility(View.VISIBLE);
-                    });
-
-                    client = client.newBuilder()
-                            .addNetworkInterceptor(new Interceptor() {
-                                @Override
-                                public Response intercept(Chain chain) throws IOException {
-                                    Response re = chain.proceed(chain.request());
-                                    return re.newBuilder()
-                                            .body(new ProgressResponseBody(re.body(), listener))
-                                            .build();
-                                }
-                            })
-                            .build();
-
-                    request = new Request.Builder()
-                            .url(videoInfo.getString("url"))
-                            .build();
-
-                    call = client.newCall(request);
-
-                    re = call.execute();
-                    if (re.isSuccessful()) {
-                        tempFile = re.body().bytes();
-
-                        if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
-                            log(OutputUtil.save(tempFile, this.getExternalFilesDir(null) + "/Video", input_url.getText().toString() + ".mp4"));
-                        } else {
-                            Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-                            it.addCategory(Intent.CATEGORY_OPENABLE);
-                            it.setType("video/mp4");
-                            it.putExtra(Intent.EXTRA_TITLE, input_url.getText().toString() + ".mp4");
-                            startActivityForResult(it, 1);
-                        }
-
-                    } else {
-                        log("获取失败: 第二次API请求出错, 无法下载视频");
-                    }
-
-                } else {
-                    log("获取失败: 第一次API请求出错, 无法获取视频Url");
-                }
-            } catch (IOException e) {
-                e.printStackTrace();
-                log("错误: " + e.getMessage());
-            } finally {
-                hideProgressBar();
-            }
-
-        });
 
         btn_resolve.setOnClickListener((v) -> {
             String in = input_url.getText().toString();
@@ -162,7 +74,84 @@ public class VideoGetActivity extends AppCompatActivity {
                 return;
             }
 
-            thread_download.start();
+            if (!isDownloading) {
+                thread_download = new Thread(() -> {
+                    isDownloading = true;
+
+                    log("开始解析视频...");
+                    OkHttpClient client = new OkHttpClient.Builder()
+                            .build();
+
+                    String requestUrl = "https://api.injahow.cn/bparse/?bv=" + input_url.getText().toString().substring(2) +
+                            "&p=" + (input_p.getText().toString() == "" ? "1" : input_p.getText().toString()) +
+                            "&format=mp4" +
+                            "&otype=json";
+                    Request request = new Request.Builder()
+                            .url(requestUrl)
+                            .get()
+                            .build();
+
+                    Call call = client.newCall(request);
+                    try {
+                        Response re = call.execute();
+                        if (re.isSuccessful()) {
+                            JSONObject videoInfo = JSONObject.parseObject(re.body().string());
+
+                            if (videoInfo.getString("url") == null) {
+                                log("错误: 找不到该视频");
+                                return;
+                            }
+                            log("视频解析完毕, 正在下载...");
+
+                            client = client.newBuilder()
+                                    .build();
+
+                            request = new Request.Builder()
+                                    .url(videoInfo.getString("url"))
+                                    .build();
+
+                            call = client.newCall(request);
+
+                            re = call.execute();
+                            if (re.isSuccessful()) {
+                                ResponseBody response = re.body();
+                                tempInput = response.byteStream();
+                                tempFileLength = response.contentLength();
+
+                                if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
+                                    showProgressBar();
+                                    new Thread(() -> {
+                                        log(OutputUtil.save(tempInput, this.getExternalFilesDir(null) + "/Video", input_url.getText().toString() + ".mp4",
+                                                (current) -> {
+                                                    setProgressBarValue(Math.round(100 * current / tempFileLength));
+                                                }));
+                                        hideProgressBar();
+                                    }).start();
+                                } else {
+                                    Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                                    it.addCategory(Intent.CATEGORY_OPENABLE);
+                                    it.setType("video/mp4");
+                                    it.putExtra(Intent.EXTRA_TITLE, input_url.getText().toString() + ".mp4");
+                                    startActivityForResult(it, 1);
+                                }
+
+                            } else {
+                                log("获取失败: 第二次API请求出错, 无法下载视频");
+                            }
+
+                        } else {
+                            log("获取失败: 第一次API请求出错, 无法获取视频Url");
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        log("错误: " + e.getMessage());
+                    } finally {
+                        isDownloading = false;
+                    }
+
+                });
+                thread_download.start();
+            }
 
         });
     }
@@ -175,19 +164,24 @@ public class VideoGetActivity extends AppCompatActivity {
         }
         if (requestCode == 1) {
 
-            if (tempFile == null) {
+            if (tempInput == null) {
                 log(getString(R.string.err_file_null));
                 return;
             }
 
             Uri u = data.getData();
-            try {
-                getContentResolver().openOutputStream(u).write(tempFile);
-                log("保存成功! 目录: " + u.getPath());
-            } catch (IOException e) {
-                e.printStackTrace();
-                log("错误: " + e.getMessage());
-            }
+            showProgressBar();
+            new Thread(() -> {
+                try {
+                    log(OutputUtil.save(tempInput, getContentResolver().openOutputStream(u), u,
+                            (current) -> setProgressBarValue(Math.round(current * 100 / tempFileLength))));
+                } catch (FileNotFoundException e) {
+                    e.printStackTrace();
+                    log("错误: " + e.getMessage());
+                } finally {
+                    hideProgressBar();
+                }
+            }).start();
 
             return;
         }
@@ -227,7 +221,22 @@ public class VideoGetActivity extends AppCompatActivity {
         runOnUiThread(() -> text_log.setText(s));
     }
 
+    private void showProgressBar() {
+        runOnUiThread(() -> bar_download.setVisibility(View.VISIBLE));
+    }
+
     private void hideProgressBar() {
         runOnUiThread(() -> bar_download.setVisibility(View.GONE));
+    }
+
+    private void setProgressBarValue(int value) {
+
+        runOnUiThread(() -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
+                bar_download.setProgress(value, true);
+            else
+                bar_download.setProgress(value);
+        });
+
     }
 }
