@@ -11,7 +11,7 @@ import android.os.Bundle;
 import android.view.Menu;
 
 import com.hamster5295.htools.MenuAdapter;
-import com.hamster5295.htools.MenuItem;
+import com.hamster5295.htools.HItem;
 import com.hamster5295.htools.R;
 
 import java.util.ArrayList;
@@ -23,13 +23,14 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        ArrayList<MenuItem> data = new ArrayList<MenuItem>() {
+        ArrayList<HItem> data = new ArrayList<HItem>() {
         };
 
-        data.add(new MenuItem(getString(R.string.func_tts), ContextCompat.getDrawable(this, R.drawable.ic_func_tts), TTSActivity.class));
-        data.add(new MenuItem(getString(R.string.func_draw_function), ContextCompat.getDrawable(this, R.drawable.ic_func_draw), WebActivity.class, "https://www.desmos.com/calculator?lang=zh-CN"));
-        data.add(new MenuItem(getString(R.string.func_heading_poem), ContextCompat.getDrawable(this, R.drawable.ic_func_heading_poem), WebActivity.class, "https://cts.mofans.net/"));
-        data.add(new MenuItem(getString(R.string.func_music), ContextCompat.getDrawable(this, R.drawable.ic_func_music), MusicGetActivity.class));
+        data.add(new HItem(getString(R.string.func_tts), ContextCompat.getDrawable(this, R.drawable.ic_func_tts), TTSActivity.class));
+        data.add(new HItem(getString(R.string.func_draw_function), ContextCompat.getDrawable(this, R.drawable.ic_func_draw), WebActivity.class, "https://www.desmos.com/calculator?lang=zh-CN"));
+        data.add(new HItem(getString(R.string.func_heading_poem), ContextCompat.getDrawable(this, R.drawable.ic_func_heading_poem), WebActivity.class, "https://cts.mofans.net/"));
+        data.add(new HItem(getString(R.string.func_music), ContextCompat.getDrawable(this, R.drawable.ic_func_music), MusicGetActivity.class));
+        data.add(new HItem(getString(R.string.func_video), ContextCompat.getDrawable(this, R.drawable.ic_func_video), VideoGetActivity.class));
 
         RecyclerView v = findViewById(R.id.menu);
 

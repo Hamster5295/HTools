@@ -7,16 +7,15 @@ import android.view.ViewGroup;
 import android.widget.Button;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
 public class MenuAdapter extends RecyclerView.Adapter<MenuAdapter.MenuEntry> {
 
-    private List<MenuItem> datas;
+    private List<HItem> datas;
 
-    public MenuAdapter(List<MenuItem> d) {
+    public MenuAdapter(List<HItem> d) {
         datas = d;
     }
 
@@ -49,7 +48,7 @@ public class MenuAdapter extends RecyclerView.Adapter<MenuAdapter.MenuEntry> {
             btn = itemView.findViewById(R.id.btn_menuItem);
         }
 
-        public void Init(MenuItem i) {
+        public void Init(HItem i) {
             i.icon.setBounds(0, 0, i.icon.getMinimumWidth(), i.icon.getMinimumHeight());
             btn.setCompoundDrawables(i.icon, null, null, null);
             btn.setText(i.text);

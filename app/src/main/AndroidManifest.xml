@@ -12,6 +12,9 @@
         android:theme="@style/Theme.HTools"
         android:usesCleartextTraffic="true">
         <activity
+            android:name=".activities.VideoGetActivity"
+            android:exported="false" />
+        <activity
             android:name=".activities.MusicGetActivity"
             android:exported="false"
             android:label="@string/func_music" />
@@ -38,8 +41,8 @@
         </activity>
     </application>
 
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
 
 </manifest>

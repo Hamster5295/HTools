@@ -24,6 +24,7 @@ import androidx.preference.PreferenceManager;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.hamster5295.htools.GlobalData;
+import com.hamster5295.htools.OutputUtil;
 import com.hamster5295.htools.R;
 
 import java.io.File;
@@ -44,7 +45,6 @@ public class TTSActivity extends AppCompatActivity {
     private Button btn_save;
     private EditText input_content, input_fileName;
     private Spinner spinner_soundFont;
-    private Handler logHandler;
 
     private byte[] tempFile;
 
@@ -63,13 +63,6 @@ public class TTSActivity extends AppCompatActivity {
         input_content = findViewById(R.id.et_tts);
         input_fileName = findViewById(R.id.et_tts_fileName);
         spinner_soundFont = findViewById(R.id.spinner_tts);
-
-        logHandler = new Handler() {
-            @Override
-            public void handleMessage(@NonNull Message msg) {
-                text_log.setText(msg.getData().getString("Log"));
-            }
-        };
 
         //获取百度API的Token
         new Thread(() -> {
@@ -97,7 +90,7 @@ public class TTSActivity extends AppCompatActivity {
             btn_save.setOnClickListener((v) ->
                     new Thread(() -> {
                         try {
-                            getTTS(logHandler);
+                            getTTS();
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
@@ -116,7 +109,7 @@ public class TTSActivity extends AppCompatActivity {
                 btn_save.setOnClickListener((v) ->
                         new Thread(() -> {
                             try {
-                                getTTS(logHandler);
+                                getTTS();
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
@@ -167,7 +160,7 @@ public class TTSActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    protected void getTTS(Handler logger) throws Exception {
+    protected void getTTS() throws Exception {
         if (input_fileName.getText().toString().equals("")) {
             log("请输入文件名");
             return;
@@ -220,13 +213,7 @@ public class TTSActivity extends AppCompatActivity {
             tempFile = response.body().bytes();
 
             if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
-                File f = new File(TTSActivity.this.getExternalFilesDir(null), "/TTS");
-                f.mkdirs();
-                FileOutputStream os = new FileOutputStream(f.getAbsolutePath() + "/" + input_fileName.getText().toString() + ".mp3");
-                os.write(tempFile);
-                os.flush();
-                os.close();
-                log("保存成功!\n目录: " + f.getPath() + "/" + input_fileName.getText().toString() + ".mp3");
+                log(OutputUtil.save(tempFile, getExternalFilesDir(null) + "/TTS", input_fileName.getText().toString()));
             } else {
                 Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                 it.addCategory(Intent.CATEGORY_OPENABLE);
@@ -261,10 +248,6 @@ public class TTSActivity extends AppCompatActivity {
     }
 
     private void log(String str) {
-        Message msg = new Message();
-        Bundle b = new Bundle();
-        b.putString("Log", str);
-        msg.setData(b);
-        logHandler.handleMessage(msg);
+        runOnUiThread(() -> text_log.setText(str));
     }
 }

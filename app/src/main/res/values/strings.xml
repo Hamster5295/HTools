@@ -10,7 +10,7 @@
     <string name="func_heading_poem">藏头诗生成</string>
     <string name="func_web">网页工具</string>
     <string name="func_music">音乐下载</string>
-
+    <string name="func_video">视频下载</string>
 
     <string name="no_permission">权限未通过</string>
     <string name="title_activity_settings">SettingsActivity</string>
@@ -21,6 +21,12 @@
 
     <string name="help">帮助</string>
     <string name="help_music">使用步骤:\n1. 在网易云音乐App找到音乐\n2. 点击\"分享\", 然后\"复制链接\"\n3. 将链接粘贴到此处\n4. 点击\"开始\"</string>
+    <string name="help_video">1. 复制视频的BV号\n2. 粘贴到此处\n3. 点击\"开始\"按钮</string>
+
     <string name="err_file_select_blocked">文件路径选择中断</string>
     <string name="err_file_null">文件获取失败</string>
+    <string name="func_video_resolve">解析</string>
+    <string name="input_bv">输入BV号</string>
+    <string name="download">下载</string>
+    <string name="input_p">输入选集</string>
 </resources>

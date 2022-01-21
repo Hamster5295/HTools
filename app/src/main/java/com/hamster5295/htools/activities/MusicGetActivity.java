@@ -14,24 +14,22 @@ import android.os.Handler;
 import android.os.Message;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.hamster5295.htools.OutputUtil;
 import com.hamster5295.htools.R;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 
 import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.FormBody;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -41,6 +39,7 @@ public class MusicGetActivity extends AppCompatActivity {
     private EditText input_url;
     private Button btn_start;
     private TextView text_log;
+    private ProgressBar bar_download;
 
     private Handler handler_log;
 
@@ -56,16 +55,10 @@ public class MusicGetActivity extends AppCompatActivity {
             actionBar.setDisplayHomeAsUpEnabled(true);
         }
 
-        handler_log = new Handler() {
-            @Override
-            public void handleMessage(@NonNull Message msg) {
-                text_log.setText(msg.getData().getString("Log"));
-            }
-        };
-
         input_url = findViewById(R.id.et_music_url);
         btn_start = findViewById(R.id.btn_music_start);
         text_log = findViewById(R.id.text_music_log);
+        bar_download = findViewById(R.id.pgbar_music_download);
 
         btn_start.setOnClickListener((v) -> {
             String in = input_url.getText().toString();
@@ -75,6 +68,8 @@ public class MusicGetActivity extends AppCompatActivity {
             } else {
 
                 String songId = in.split("song\\?id=")[1].split("&")[0];
+
+                bar_download.setVisibility(View.VISIBLE);
 
                 new Thread(() -> {
                     OkHttpClient client = new OkHttpClient.Builder()
@@ -104,15 +99,9 @@ public class MusicGetActivity extends AppCompatActivity {
                                 tempFile = re.body().bytes();
 
                                 if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
-                                    File f = new File(this.getExternalFilesDir(null), "/Music");
-                                    f.mkdirs();
-                                    FileOutputStream os = new FileOutputStream(f.getAbsolutePath() + "/" +
-                                            song.getString("artist") + " - " + song.getString("name") + ".mp3");
-                                    os.write(tempFile);
-                                    os.flush();
-                                    os.close();
-                                    log("保存成功!\n目录: " + f.getPath() + "/" +
-                                            song.getString("artist") + " - " + song.getString("name") + ".mp3");
+                                    log(OutputUtil.save(tempFile,
+                                            this.getExternalFilesDir(null) + "/Music",
+                                            song.getString("artist").replace('/', '&') + " - " + song.getString("name") + ".mp3"));
                                 } else {
                                     Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                                     it.addCategory(Intent.CATEGORY_OPENABLE);
@@ -130,6 +119,9 @@ public class MusicGetActivity extends AppCompatActivity {
                         }
                     } catch (IOException e) {
                         e.printStackTrace();
+                        log("错误: " + e.getMessage());
+                    } finally {
+                        hideProgressBar();
                     }
 
                 }).start();
@@ -190,10 +182,10 @@ public class MusicGetActivity extends AppCompatActivity {
     }
 
     private void log(String s) {
-        Bundle b = new Bundle();
-        Message msg = new Message();
-        b.putString("Log", s);
-        msg.setData(b);
-        handler_log.sendMessage(msg);
+        runOnUiThread(() -> text_log.setText(s));
+    }
+
+    private void hideProgressBar() {
+        runOnUiThread(() -> bar_download.setVisibility(View.GONE));
     }
 }
