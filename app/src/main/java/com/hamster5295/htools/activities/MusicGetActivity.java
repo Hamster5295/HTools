@@ -62,12 +62,19 @@ public class MusicGetActivity extends AppCompatActivity {
 
         btn_start.setOnClickListener((v) -> {
             String in = input_url.getText().toString();
-            if (!in.contains("song?id=")) {
+            if (!(in.contains("song?id=") || in.contains("/song/"))) {
                 log("输入错误: 是不是复制错了");
                 return;
             } else {
-
-                String songId = in.split("song\\?id=")[1].split("&")[0];
+                String songId;
+                if (in.contains("song?id="))
+                    songId = in.split("song\\?id=")[1].split("&")[0];
+                else if (in.contains("/song/"))
+                    songId = in.split("/song/")[1].split("/")[0];
+                else {
+                    log("输入错误: 是不是复制错了");
+                    return;
+                }
 
                 bar_download.setVisibility(View.VISIBLE);
 
