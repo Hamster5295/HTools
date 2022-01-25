@@ -29,4 +29,5 @@
     <string name="input_bv">输入BV号</string>
     <string name="download">下载</string>
     <string name="input_p">输入选集</string>
+    <string name="add_to_download_queue">已加入下载队列</string>
 </resources>

@@ -1,17 +1,11 @@
 package com.hamster5295.htools.activities;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AlertDialog;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.preference.PreferenceManager;
-
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Message;
+import android.os.IBinder;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -20,12 +14,19 @@ import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.preference.PreferenceManager;
+
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.hamster5295.htools.OutputUtil;
+import com.hamster5295.htools.DownloadTask;
 import com.hamster5295.htools.R;
+import com.hamster5295.htools.services.DownloadService;
 
-import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 
@@ -33,6 +34,7 @@ import okhttp3.Call;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import okhttp3.ResponseBody;
 
 public class MusicGetActivity extends AppCompatActivity {
 
@@ -41,9 +43,21 @@ public class MusicGetActivity extends AppCompatActivity {
     private TextView text_log;
     private ProgressBar bar_download;
 
-    private Handler handler_log;
+    private ResponseBody response;
+    private String fileName;
 
-    private byte[] tempFile;
+    private DownloadService.Binder binder;
+    private ServiceConnection conn = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            binder = (DownloadService.Binder) iBinder;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,6 +73,8 @@ public class MusicGetActivity extends AppCompatActivity {
         btn_start = findViewById(R.id.btn_music_start);
         text_log = findViewById(R.id.text_music_log);
         bar_download = findViewById(R.id.pgbar_music_download);
+
+        bindService(new Intent(this, DownloadService.class), conn, BIND_AUTO_CREATE);
 
         btn_start.setOnClickListener((v) -> {
             String in = input_url.getText().toString();
@@ -102,18 +118,18 @@ public class MusicGetActivity extends AppCompatActivity {
 
                             re = call.execute();
                             if (re.isSuccessful()) {
-
-                                tempFile = re.body().bytes();
+                                response = re.body();
+                                fileName = song.getString("artist") + " - " + song.getString("name") + ".mp3";
 
                                 if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
-                                    log(OutputUtil.save(tempFile,
-                                            this.getExternalFilesDir(null) + "/Music",
-                                            song.getString("artist").replace('/', '&') + " - " + song.getString("name") + ".mp3"));
+                                    binder.startDownloadTask(new DownloadTask(response.byteStream(), new FileOutputStream(this.getExternalFilesDir(null) + "/Music/" + fileName),
+                                            response.contentLength(), fileName));
+                                    log(getString(R.string.add_to_download_queue));
                                 } else {
                                     Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                                     it.addCategory(Intent.CATEGORY_OPENABLE);
                                     it.setType("audio/mpeg");
-                                    it.putExtra(Intent.EXTRA_TITLE, song.getString("artist") + " - " + song.getString("name") + ".mp3");
+                                    it.putExtra(Intent.EXTRA_TITLE, fileName);
                                     startActivityForResult(it, 1);
                                 }
 
@@ -145,7 +161,7 @@ public class MusicGetActivity extends AppCompatActivity {
 
         if (requestCode == 1) {
 
-            if (tempFile == null) {
+            if (response == null) {
                 log(getString(R.string.err_file_null));
                 return;
             }
@@ -153,12 +169,13 @@ public class MusicGetActivity extends AppCompatActivity {
             Uri u = data.getData();
 
             try {
-                getContentResolver().openOutputStream(u).write(tempFile);
-                log("保存成功! 目录: " + u.getPath());
+                binder.startDownloadTask(new DownloadTask(response.byteStream(), getContentResolver().openOutputStream(u), response.contentLength(), fileName));
             } catch (IOException e) {
                 e.printStackTrace();
                 log("错误: " + e.getMessage());
             }
+
+            log(getString(R.string.add_to_download_queue));
 
             return;
         }
@@ -186,6 +203,12 @@ public class MusicGetActivity extends AppCompatActivity {
                     }).show();
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unbindService(conn);
     }
 
     private void log(String s) {

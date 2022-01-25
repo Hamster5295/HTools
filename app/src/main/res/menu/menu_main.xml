@@ -3,6 +3,11 @@
     xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
+        android:id="@+id/opt_main_downloads"
+        android:icon="@drawable/ic_download"
+        android:title="@string/download"
+        app:showAsAction="always" />
+    <item
         android:id="@+id/opt_main_settings"
         android:icon="@drawable/ic__settings"
         android:title="Settings"

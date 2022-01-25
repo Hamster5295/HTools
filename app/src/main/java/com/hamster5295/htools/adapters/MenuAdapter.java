@@ -1,4 +1,4 @@
-package com.hamster5295.htools;
+package com.hamster5295.htools.adapters;
 
 import android.content.Intent;
 import android.view.LayoutInflater;
@@ -8,6 +8,9 @@ import android.widget.Button;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+
+import com.hamster5295.htools.HItem;
+import com.hamster5295.htools.R;
 
 import java.util.List;
 
@@ -28,7 +31,7 @@ public class MenuAdapter extends RecyclerView.Adapter<MenuAdapter.MenuEntry> {
 
     @Override
     public void onBindViewHolder(@NonNull MenuEntry holder, int position) {
-        holder.Init(datas.get(position));
+        holder.init(datas.get(position));
     }
 
     @Override
@@ -48,7 +51,7 @@ public class MenuAdapter extends RecyclerView.Adapter<MenuAdapter.MenuEntry> {
             btn = itemView.findViewById(R.id.btn_menuItem);
         }
 
-        public void Init(HItem i) {
+        public void init(@NonNull HItem i) {
             i.icon.setBounds(0, 0, i.icon.getMinimumWidth(), i.icon.getMinimumHeight());
             btn.setCompoundDrawables(i.icon, null, null, null);
             btn.setText(i.text);

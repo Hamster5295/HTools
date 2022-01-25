@@ -1,18 +1,19 @@
 package com.hamster5295.htools.activities;
 
+import android.content.Intent;
+import android.os.Bundle;
+import android.view.Menu;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 
-import android.content.Intent;
-import android.os.Bundle;
-import android.view.Menu;
-
-import com.hamster5295.htools.MenuAdapter;
 import com.hamster5295.htools.HItem;
 import com.hamster5295.htools.R;
+import com.hamster5295.htools.adapters.MenuAdapter;
+import com.hamster5295.htools.services.DownloadService;
 
 import java.util.ArrayList;
 
@@ -32,10 +33,12 @@ public class MainActivity extends AppCompatActivity {
         data.add(new HItem(getString(R.string.func_music), ContextCompat.getDrawable(this, R.drawable.ic_func_music), MusicGetActivity.class));
         data.add(new HItem(getString(R.string.func_video), ContextCompat.getDrawable(this, R.drawable.ic_func_video), VideoGetActivity.class));
 
-        RecyclerView v = findViewById(R.id.menu);
+        RecyclerView v = findViewById(R.id.recycler_main);
 
         v.setLayoutManager(new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL));
         v.setAdapter(new MenuAdapter(data));
+
+        startService(new Intent(this, DownloadService.class));
     }
 
     @Override
@@ -48,6 +51,10 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(@NonNull android.view.MenuItem item) {
         if (item.getItemId() == R.id.opt_main_settings) {
             Intent it = new Intent(MainActivity.this, SettingsActivity.class);
+            MainActivity.this.startActivity(it);
+            return true;
+        } else if (item.getItemId() == R.id.opt_main_downloads) {
+            Intent it = new Intent(MainActivity.this, DownloadActivity.class);
             MainActivity.this.startActivity(it);
             return true;
         } else {

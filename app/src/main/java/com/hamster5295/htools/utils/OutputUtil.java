@@ -1,8 +1,7 @@
-package com.hamster5295.htools;
+package com.hamster5295.htools.utils;
 
 import android.net.Uri;
 
-import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;

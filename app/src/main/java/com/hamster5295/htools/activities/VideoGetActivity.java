@@ -1,5 +1,18 @@
 package com.hamster5295.htools.activities;
 
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.ServiceConnection;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Bundle;
+import android.os.IBinder;
+import android.view.Menu;
+import android.view.MenuItem;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.TextView;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
@@ -8,25 +21,13 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.PreferenceManager;
 
-import android.content.Intent;
-import android.net.Uri;
-import android.os.Build;
-import android.os.Bundle;
-import android.view.Menu;
-import android.view.MenuItem;
-import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.ProgressBar;
-import android.widget.TextView;
-
 import com.alibaba.fastjson.JSONObject;
-import com.hamster5295.htools.OutputUtil;
+import com.hamster5295.htools.DownloadTask;
 import com.hamster5295.htools.R;
+import com.hamster5295.htools.services.DownloadService;
 
-import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 
 import okhttp3.Call;
 import okhttp3.OkHttpClient;
@@ -39,14 +40,25 @@ public class VideoGetActivity extends AppCompatActivity {
     private EditText input_url, input_p;
     private Button btn_resolve;
     private TextView text_log;
-    private ProgressBar bar_download;
 
     private Thread thread_download;
 
-    private long tempFileLength;
-    private InputStream tempInput;
+    private ResponseBody response;
 
     private boolean isDownloading = false;
+
+    private DownloadService.Binder binder;
+    private ServiceConnection conn = new ServiceConnection() {
+        @Override
+        public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+            binder = (DownloadService.Binder) iBinder;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName componentName) {
+
+        }
+    };
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
@@ -63,8 +75,8 @@ public class VideoGetActivity extends AppCompatActivity {
         input_p = findViewById(R.id.et_video_p);
         btn_resolve = findViewById(R.id.btn_video_resolve);
         text_log = findViewById(R.id.text_video_log);
-        bar_download = findViewById(R.id.pgbar_video_download);
 
+        bindService(new Intent(this, DownloadService.class), conn, BIND_AUTO_CREATE);
 
         btn_resolve.setOnClickListener((v) -> {
             String in = input_url.getText().toString();
@@ -101,7 +113,7 @@ public class VideoGetActivity extends AppCompatActivity {
                                 log("错误: 找不到该视频");
                                 return;
                             }
-                            log("视频解析完毕, 正在下载...");
+                            log("视频解析完毕, 正在启动下载...");
 
                             client = client.newBuilder()
                                     .build();
@@ -114,19 +126,12 @@ public class VideoGetActivity extends AppCompatActivity {
 
                             re = call.execute();
                             if (re.isSuccessful()) {
-                                ResponseBody response = re.body();
-                                tempInput = response.byteStream();
-                                tempFileLength = response.contentLength();
+                                response = re.body();
 
                                 if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
-                                    showProgressBar();
-                                    new Thread(() -> {
-                                        log(OutputUtil.save(tempInput, this.getExternalFilesDir(null) + "/Video", input_url.getText().toString() + ".mp4",
-                                                (current) -> {
-                                                    setProgressBarValue(Math.round(100 * current / tempFileLength));
-                                                }));
-                                        hideProgressBar();
-                                    }).start();
+                                    binder.startDownloadTask(new DownloadTask(response.byteStream(), new FileOutputStream(this.getExternalFilesDir(null) + "/Video/" + input_url.getText().toString() + ".mp4")
+                                            , response.contentLength(), input_url.getText().toString() + ".mp4"));
+                                    log(getString(R.string.add_to_download_queue));
                                 } else {
                                     Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                                     it.addCategory(Intent.CATEGORY_OPENABLE);
@@ -164,35 +169,28 @@ public class VideoGetActivity extends AppCompatActivity {
         }
         if (requestCode == 1) {
 
-            if (tempInput == null) {
+            if (response == null) {
                 log(getString(R.string.err_file_null));
                 return;
             }
 
             Uri u = data.getData();
-            showProgressBar();
-            new Thread(() -> {
-                try {
-                    log(OutputUtil.save(tempInput, getContentResolver().openOutputStream(u), u,
-                            (current) -> setProgressBarValue(Math.round(current * 100 / tempFileLength))));
-                } catch (FileNotFoundException e) {
-                    e.printStackTrace();
-                    log("错误: " + e.getMessage());
-                } finally {
-                    hideProgressBar();
-                }
-            }).start();
 
+            try {
+                binder.startDownloadTask(new DownloadTask(response.byteStream(), getContentResolver().openOutputStream(u), response.contentLength(), input_url.getText().toString() + ".mp4"));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            log(getString(R.string.add_to_download_queue));
             return;
         }
-
         super.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        thread_download.interrupt();
+        unbindService(conn);
     }
 
     @Override
@@ -219,24 +217,5 @@ public class VideoGetActivity extends AppCompatActivity {
 
     private void log(String s) {
         runOnUiThread(() -> text_log.setText(s));
-    }
-
-    private void showProgressBar() {
-        runOnUiThread(() -> bar_download.setVisibility(View.VISIBLE));
-    }
-
-    private void hideProgressBar() {
-        runOnUiThread(() -> bar_download.setVisibility(View.GONE));
-    }
-
-    private void setProgressBarValue(int value) {
-
-        runOnUiThread(() -> {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N)
-                bar_download.setProgress(value, true);
-            else
-                bar_download.setProgress(value);
-        });
-
     }
 }
