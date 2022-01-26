@@ -4,7 +4,6 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Looper;
 import android.os.Message;
 
 import androidx.annotation.NonNull;
@@ -39,8 +38,10 @@ public class DownloadService extends Service {
 
         //检查下载完成
         new Thread(() -> {
-            Looper.prepare();
+            boolean i = false;
+
             while (flag) {
+                i = false;
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
@@ -51,12 +52,14 @@ public class DownloadService extends Service {
                 Iterator<DownloadTask> iterator = tasks.iterator();
                 while (iterator.hasNext()) {
                     DownloadTask t = iterator.next();
-                    if (t.getState() == DownloadTask.FINISHED) {
+                    if (t.getState() == DownloadTask.FINISHED || t.getState() == DownloadTask.ERROR || t.getState() == DownloadTask.CANCELLED) {
                         finishedTasks.add(t);
                         iterator.remove();
-                        handler.sendEmptyMessage(0x01);
+                        i = true;
                     }
                 }
+                if (i)
+                    handler.sendEmptyMessage(0x01);
             }
         }).start();
     }
@@ -87,14 +90,6 @@ public class DownloadService extends Service {
         public void startDownloadTask(DownloadTask task) {
             tasks.add(task);
             task.start();
-        }
-
-        public void pauseDownloadTask(int index) {
-            tasks.get(index).pause();
-        }
-
-        public void continueDownloadTask(int index) {
-            tasks.get(index).restart();
         }
     }
 }

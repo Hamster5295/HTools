@@ -3,8 +3,11 @@ package com.hamster5295.htools;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 
 public class DownloadTask {
+    public static int currentID = 0;
+
     public static final int
             READY = 0,
             RUNNING = 1,
@@ -13,6 +16,11 @@ public class DownloadTask {
             FINISHED = 4,
             ERROR = -1;
 
+    public int getTaskID() {
+        return taskID;
+    }
+
+    private int taskID;
     private InputStream in;
     private OutputStream out;
     private String fileName;
@@ -29,7 +37,11 @@ public class DownloadTask {
 
         try {
             while ((len = in.read(temp)) != -1) {
-                if (state == ERROR) {
+                while (state == PAUSED) {
+                    Thread.sleep(1000);
+                }
+
+                if (state == ERROR || state == CANCELLED) {
                     in.close();
                     out.close();
                     return;
@@ -52,6 +64,9 @@ public class DownloadTask {
         this.fileName = fileName;
         total = contentLength;
         state = READY;
+
+        taskID = currentID;
+        currentID++;
     }
 
     public void start() {
@@ -63,20 +78,11 @@ public class DownloadTask {
 
     public void pause() {
         state = PAUSED;
-
-        try {
-            downloadThread.wait();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            exception = e;
-            state = ERROR;
-        }
     }
 
     public void restart() {
         if (state != PAUSED) return;
-
-        downloadThread.notify();
+        state = RUNNING;
     }
 
     public void cancel() {
@@ -96,9 +102,12 @@ public class DownloadTask {
     public int getProgress() {
         switch (state) {
             case FINISHED:
+            case CANCELLED:
+            case ERROR:
                 return 100;
 
             case RUNNING:
+            case PAUSED:
                 if (total == 0) return 0;
                 return Math.round(100 * current / total);
 
@@ -113,5 +122,18 @@ public class DownloadTask {
 
     public Exception getException() {
         return exception;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        DownloadTask that = (DownloadTask) o;
+        return taskID == that.taskID && state == that.state && total == that.total && current == that.current && Objects.equals(in, that.in) && Objects.equals(out, that.out) && Objects.equals(fileName, that.fileName) && Objects.equals(exception, that.exception) && Objects.equals(downloadThread, that.downloadThread);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(taskID, in, out, fileName, state, total, current, exception, downloadThread);
     }
 }
