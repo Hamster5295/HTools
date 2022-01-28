@@ -30,4 +30,5 @@
     <string name="download">下载</string>
     <string name="input_p">输入选集</string>
     <string name="add_to_download_queue">已加入下载队列</string>
+    <string name="input_music_url">输入网易云歌曲/歌单的分享链接</string>
 </resources>

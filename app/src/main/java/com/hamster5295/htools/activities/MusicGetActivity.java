@@ -1,11 +1,13 @@
 package com.hamster5295.htools.activities;
 
 import android.content.ComponentName;
+import android.content.ContentResolver;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.provider.DocumentsContract;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -29,6 +31,8 @@ import com.hamster5295.htools.services.DownloadService;
 
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 import okhttp3.Call;
 import okhttp3.OkHttpClient;
@@ -38,13 +42,14 @@ import okhttp3.ResponseBody;
 
 public class MusicGetActivity extends AppCompatActivity {
 
+    private final int CODE_SONG = 1, CODE_PLAYLIST = 2;
+
     private EditText input_url;
     private Button btn_start;
     private TextView text_log;
     private ProgressBar bar_download;
 
-    private ResponseBody response;
-    private String fileName;
+    private final HashMap<String, ResponseBody> songs = new HashMap<>();
 
     private DownloadService.Binder binder;
     private ServiceConnection conn = new ServiceConnection() {
@@ -78,11 +83,84 @@ public class MusicGetActivity extends AppCompatActivity {
 
         btn_start.setOnClickListener((v) -> {
             String in = input_url.getText().toString();
-            if (!(in.contains("song?id=") || in.contains("/song/"))) {
+            String songId;
+            songs.clear();
+
+            if (!(in.contains("song?id=") || in.contains("/song/") || in.contains("playlist?id="))) {
                 log("输入错误: 是不是复制错了");
                 return;
+            } else if (in.contains("playlist?id=")) {
+                String playListID = in.split("playlist\\?id=")[1].split("&")[0];
+                bar_download.setVisibility(View.VISIBLE);
+
+                log("正在解析歌单信息...");
+
+                new Thread(() -> {
+                    OkHttpClient client = new OkHttpClient.Builder()
+                            .build();
+
+                    Request request = new Request.Builder()
+                            .url("https://api.injahow.cn/meting/?type=playlist&id=" + playListID)
+                            .get()
+                            .build();
+
+                    Call call = client.newCall(request);
+                    try {
+                        Response re = call.execute();
+                        if (re.isSuccessful()) {
+                            JSONArray songList = JSONArray.parseArray(re.body().string());
+
+                            for (int i = 0; i < songList.size(); i++) {
+                                try {
+                                    log("正在解析第" + (i + 1) + "首歌 ");
+                                    JSONObject song = songList.getJSONObject(i);
+
+                                    request = new Request.Builder()
+                                            .url(song.getString("url"))
+                                            .addHeader("Connection", "close")    //防止出现莫名其妙的Timeout
+                                            .build();
+
+                                    call = client.newCall(request);
+
+                                    re = call.execute();
+                                    if (re.isSuccessful()) {
+                                        songs.put(song.getString("artist") + " - " + song.getString("name") + ".mp3", re.body());
+                                    } else {
+                                        log("获取失败: 第" + (i + 1) + "首歌曲的请求出错");
+                                    }
+                                } catch (Exception e) {
+                                    log("错误: " + e.getMessage());
+                                    e.printStackTrace();
+                                }
+                            }
+
+                            if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
+                                for (Map.Entry<String, ResponseBody> item :
+                                        songs.entrySet()) {
+                                    binder.startDownloadTask(new DownloadTask(item.getValue().byteStream(), new FileOutputStream(this.getExternalFilesDir(null) + "/Music/" + item.getKey()),
+                                            item.getValue().contentLength(), item.getKey()));
+                                }
+                                log(getString(R.string.add_to_download_queue));
+                            } else {
+                                Intent it = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                                startActivityForResult(it, CODE_PLAYLIST);
+                            }
+
+                        } else {
+                            log("获取失败: 第一次API请求出错, 无法获取音乐Url");
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        log("错误: " + e.getMessage());
+                    } finally {
+                        hideProgressBar();
+                    }
+
+                }).start();
             } else {
-                String songId;
+                //单曲
+                songs.clear();
+
                 if (in.contains("song?id="))
                     songId = in.split("song\\?id=")[1].split("&")[0];
                 else if (in.contains("/song/"))
@@ -118,25 +196,27 @@ public class MusicGetActivity extends AppCompatActivity {
 
                             re = call.execute();
                             if (re.isSuccessful()) {
-                                response = re.body();
-                                fileName = song.getString("artist") + " - " + song.getString("name") + ".mp3";
+                                String fileName = song.getString("artist") + " - " + song.getString("name") + ".mp3";
+                                songs.put(fileName, re.body());
 
                                 if (PreferenceManager.getDefaultSharedPreferences(this).getBoolean("pref_default_path", false)) {
-                                    binder.startDownloadTask(new DownloadTask(response.byteStream(), new FileOutputStream(this.getExternalFilesDir(null) + "/Music/" + fileName),
-                                            response.contentLength(), fileName));
+                                    for (Map.Entry<String, ResponseBody> item :
+                                            songs.entrySet()) {
+                                        binder.startDownloadTask(new DownloadTask(item.getValue().byteStream(), new FileOutputStream(this.getExternalFilesDir(null) + "/Music/" + item.getKey()),
+                                                item.getValue().contentLength(), item.getKey()));
+                                    }
+                                    log(getString(R.string.add_to_download_queue));
                                     log(getString(R.string.add_to_download_queue));
                                 } else {
                                     Intent it = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                                     it.addCategory(Intent.CATEGORY_OPENABLE);
                                     it.setType("audio/mpeg");
                                     it.putExtra(Intent.EXTRA_TITLE, fileName);
-                                    startActivityForResult(it, 1);
+                                    startActivityForResult(it, CODE_SONG);
                                 }
-
                             } else {
                                 log("获取失败: 第二次API请求出错, 无法下载音乐");
                             }
-
                         } else {
                             log("获取失败: 第一次API请求出错, 无法获取音乐Url");
                         }
@@ -159,26 +239,32 @@ public class MusicGetActivity extends AppCompatActivity {
             return;
         }
 
-        if (requestCode == 1) {
+        Uri u = null;
+        if (requestCode == CODE_SONG)
+            u = data.getData();
+        else if (requestCode == CODE_PLAYLIST)
+            u = DocumentsContract.buildDocumentUriUsingTree(data.getData(), DocumentsContract.getTreeDocumentId(data.getData()));
+        ContentResolver resolver = getContentResolver();
 
-            if (response == null) {
-                log(getString(R.string.err_file_null));
-                return;
-            }
-
-            Uri u = data.getData();
-
+        boolean isAlright = true;
+        for (Map.Entry<String, ResponseBody> item :
+                songs.entrySet()) {
             try {
-                binder.startDownloadTask(new DownloadTask(response.byteStream(), getContentResolver().openOutputStream(u), response.contentLength(), fileName));
+                if (requestCode == CODE_SONG)
+                    binder.startDownloadTask(new DownloadTask(item.getValue().byteStream(), resolver.openOutputStream(u),
+                            item.getValue().contentLength(), item.getKey()));
+                else if (requestCode == CODE_PLAYLIST) {
+                    binder.startDownloadTask(new DownloadTask(item.getValue().byteStream(), resolver.openOutputStream(DocumentsContract.createDocument(resolver, u, "audio/mpeg", item.getKey())),
+                            item.getValue().contentLength(), item.getKey()));
+                }
             } catch (IOException e) {
+                isAlright = false;
                 e.printStackTrace();
                 log("错误: " + e.getMessage());
             }
-
-            log(getString(R.string.add_to_download_queue));
-
-            return;
         }
+
+        if (isAlright) log(getString(R.string.add_to_download_queue));
 
         super.onActivityResult(requestCode, resultCode, data);
     }

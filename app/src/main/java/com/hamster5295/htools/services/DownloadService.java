@@ -22,7 +22,8 @@ public class DownloadService extends Service {
         @Override
         public void handleMessage(@NonNull Message msg) {
             if (msg.what == 0x01) {
-                mBinder.getAdapter().refresh();
+                if (mBinder.getAdapter() != null)
+                    mBinder.getAdapter().refresh();
             }
         }
     };
